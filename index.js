@@ -1,4 +1,5 @@
 'use strict';
+
 const chalk = require('chalk');
 const gradient = require('gradient-string');
 
@@ -6,7 +7,7 @@ const log = console.log;
 let currentAnimation = null;
 
 const consoleFunctions = {
-	log: console.log.bind(console),
+	log: log.bind(console),
 	info: console.info.bind(console),
 	warn: console.warn.bind(console),
 	error: console.error.bind(console)
@@ -68,6 +69,7 @@ const effects = {
 
 		const chunkSize = Math.max(3, Math.round(str.length * 0.02));
 		const chunks = [];
+
 		for (let i = 0, length = str.length; i < length; i++) {
 			const skip = Math.round(Math.max(0, (Math.random() - 0.8) * chunkSize));
 			chunks.push(str.substring(i, i + skip).replace(/[^\r\n]/g, ' '));
@@ -112,6 +114,13 @@ const effects = {
 	neon(str, frame) {
 		const color = (frame % 2 === 0) ? chalk.dim.rgb(88, 80, 85) : chalk.bold.rgb(213, 70, 242);
 		return color(str);
+	},
+	karaoke(str, frame) {
+		const chars = (frame % (str.length + 20)) - 10;
+		if (chars < 0) {
+			return chalk.white(str);
+		}
+		return chalk.rgb(255, 187, 0).bold(str.substr(0, chars)) + chalk.white(str.substr(chars));
 	}
 };
 
@@ -124,29 +133,48 @@ function animateString(str, effect, delay, speed) {
 	}
 
 	currentAnimation = {
+		text: str.split(/\r\n|\r|\n/),
+		lines: str.split(/\r\n|\r|\n/).length,
 		stopped: false,
-		frame: 0,
-		nextStep() {
+		init: false,
+		f: 0,
+		render() {
 			const self = this;
-			log('\u001B[1F\u001B[G\u001B[2K' + effect(str, this.frame));
+			if (!this.init) {
+				log('\n'.repeat(this.lines - 1));
+				this.init = true;
+			}
+			log(this.frame());
 			setTimeout(() => {
-				self.frame++;
 				if (!self.stopped) {
-					self.nextStep();
+					self.render();
 				}
 			}, delay / speed);
 		},
+		frame() {
+			this.f++;
+			return '\u001B[' + this.lines + 'F\u001B[G\u001B[2K' + this.text.map(str => effect(str, this.f)).join('\n');
+		},
+		replace(str) {
+			this.text = str.split(/\r\n|\r|\n/);
+			this.lines = str.split(/\r\n|\r|\n/).length;
+			return this;
+		},
 		stop() {
 			this.stopped = true;
+			return this;
 		},
 		start() {
 			this.stopped = false;
-			this.nextStep();
+			this.render();
+			return this;
 		}
 	};
-
-	log('');
-	currentAnimation.start();
+	setTimeout(() => {
+		if (!currentAnimation.stopped) {
+			currentAnimation.start();
+		}
+	}, delay / speed);
 	return currentAnimation;
 }
 
@@ -156,8 +184,11 @@ function stopLastAnimation() {
 	}
 }
 
-module.exports.rainbow = (str, speed) => animateString(str, effects.rainbow, 15, speed);
-module.exports.pulse = (str, speed) => animateString(str, effects.pulse, 16, speed);
-module.exports.glitch = (str, speed) => animateString(str, effects.glitch, 55, speed);
-module.exports.radar = (str, speed) => animateString(str, effects.radar, 50, speed);
-module.exports.neon = (str, speed) => animateString(str, effects.neon, 500, speed);
+module.exports = {
+	rainbow: (str, speed) => animateString(str, effects.rainbow, 15, speed),
+	pulse: (str, speed) => animateString(str, effects.pulse, 16, speed),
+	glitch: (str, speed) => animateString(str, effects.glitch, 55, speed),
+	radar: (str, speed) => animateString(str, effects.radar, 50, speed),
+	neon: (str, speed) => animateString(str, effects.neon, 500, speed),
+	karaoke: (str, speed) => animateString(str, effects.karaoke, 50, speed)
+};
